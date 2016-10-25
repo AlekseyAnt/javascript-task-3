@@ -11,7 +11,7 @@ function subtractTimeInterval(timeIntervals, interval) {
     interval = { from: interval.from, to: interval.to };
 
     for (var i = 0; i < timeIntervals.length; i++) {
-        if (interval.to <= timeIntervals.from) {
+        if (interval.to <= timeIntervals[i].from) {
             return difference.concat(timeIntervals.slice(i));
         }
 
@@ -152,13 +152,13 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
             var start = new Date(suitableTimeIntervals[0].from);
             start.setUTCMinutes(start.getUTCMinutes() + 30);
             var delay = { from: suitableTimeIntervals[0].from, to: start };
-            var newIntervals = subtractTimeInterval(suitableTimeIntervals, delay).filter(isSuitable);
+            var intervals = subtractTimeInterval(suitableTimeIntervals, delay).filter(isSuitable);
 
-            if (newIntervals.length !== 0) {
-                suitableTimeIntervals = newIntervals;
+            if (intervals.length !== 0) {
+                suitableTimeIntervals = intervals;
             }
 
-            return newIntervals.lenght !== 0;
+            return intervals.lenght !== 0;
         }
     };
 };
