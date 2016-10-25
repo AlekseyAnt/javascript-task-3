@@ -127,38 +127,54 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
     var suitableTimeIntervals = nonFreeIntervals.reduce(subtractTimeInterval, intervalsOfBankWork)
                                                 .filter(isSuitable);
 
-    function toNewFormat(s) {
-        var date = suitableTimeIntervals[0].from;
-        switch (s) {
-            case '%DD':
-                return week[date.getUTCDate() - 1];
-            case '%HH':
-                return formatTime(date.getUTCHours());
-            case '%MM':
-                return formatTime(date.getUTCMinutes());
-            default:
-                return '';
-        }
-    }
+    var obj = {};
 
-    return {
-        exists: function () {
-            return suitableTimeIntervals.length !== 0;
+    Object.defineProperties(obj, {
+        'suitableTimeIntervals': {
+            value: suitableTimeIntervals,
+            enumerable: false,
+            writable: true
         },
-        format: function (template) {
-            return (this.exists()) ? template.replace(/%[dhm]{2}/ig, toNewFormat) : '';
+        'exists': {
+            value: function () {
+                return this.suitableTimeIntervals.length !== 0;
+            },
+            enumerable: true
         },
-        tryLater: function () {
-            var start = new Date(suitableTimeIntervals[0].from);
-            start.setUTCMinutes(start.getUTCMinutes() + 30);
-            var delay = { from: suitableTimeIntervals[0].from, to: start };
-            var intervals = subtractTimeInterval(suitableTimeIntervals, delay).filter(isSuitable);
+        'format': {
+            value: function (template) {
+                if (!this.exists()) {
+                    return '';
+                }
 
-            if (intervals.length !== 0) {
-                suitableTimeIntervals = intervals;
-            }
+                var date = this.suitableTimeIntervals[0].from;
+                var day = week[date.getUTCDate() - 1];
+                var hours = formatTime(date.getUTCHours());
+                var minutes = formatTime(date.getUTCMinutes());
 
-            return intervals.lenght !== 0;
+                return template.replace('%HH', hours)
+                               .replace('%DD', day)
+                               .replace('%MM', minutes);
+            },
+            enumerable: true
+        },
+        'tryLater': {
+            value: function () {
+                var start = new Date(this.suitableTimeIntervals[0].from);
+                start.setUTCMinutes(start.getUTCMinutes() + 30);
+                var delay = { from: this.suitableTimeIntervals[0].from, to: start };
+                var intervals = subtractTimeInterval(this.suitableTimeIntervals, delay);
+                intervals = intervals.filter(isSuitable);
+
+                if (intervals.length !== 0) {
+                    this.suitableTimeIntervals = intervals;
+                }
+
+                return intervals.length !== 0;
+            },
+            enumerable: true
         }
-    };
+    });
+
+    return obj;
 };
