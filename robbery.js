@@ -155,7 +155,7 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
             var newIntervals = subtractTimeInterval(suitableTimeIntervals, delay).filter(isSuitable);
 
             if (newIntervals.length !== 0) {
-                suitableTimeIntervals = e;
+                suitableTimeIntervals = newIntervals;
             }
 
             return newIntervals.lenght !== 0;
