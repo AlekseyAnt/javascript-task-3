@@ -60,26 +60,22 @@ var week = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 
 function parseDate(date, initialReferencePoint) {
     var newDate = rewriteDay(date);
-    newDate = changeTimeZone(newDate, initialReferencePoint);
 
-    return new Date(newDate);
+    var currenttimeZone = parseInt(date.match(/\+(\d{1,2})/i)[0], 10);
+    var deffTimeZone = initialReferencePoint - currenttimeZone;
+
+    newDate.setUTCHours(newDate.getUTCHours() + deffTimeZone);
+
+    return newDate;
 }
 
-function changeTimeZone(date, initialReferencePoint) {
-    return date.replace(/\+(\d{1,2})/i, function (timeZone) {
-        var newTimeZone = parseInt(timeZone, 10) - initialReferencePoint;
-        var sign = (timeZone >= 0) ? '+' : '';
+function rewriteDay(dateStr) {
+    var date = dateStr.match(/([а-я]{2}) (\d{2}):(\d{2})/i);
+    var dayOfMonth = 1 + week.indexOf(date[1]);
+    var hours = parseInt(date[2], 10);
+    var minutes = parseInt(date[3], 10);
 
-        return ' GMT' + sign + newTimeZone + '00';
-    });
-}
-
-function rewriteDay(date) {
-    return date.replace(/([а-я]{2})/i, function (dayOfWeek) {
-        var dayOfMonth = 1 + week.indexOf(dayOfWeek);
-
-        return '2016 Oct ' + dayOfMonth;
-    });
+    return new Date(Date.UTC(2016, 10, dayOfMonth, hours, minutes));
 }
 
 function parseTimeIntervals(intervals, initialReferencePoint) {
@@ -130,14 +126,9 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
     var obj = {};
 
     Object.defineProperties(obj, {
-        'suitableTimeIntervals': {
-            value: suitableTimeIntervals,
-            enumerable: false,
-            writable: true
-        },
         'exists': {
             value: function () {
-                return this.suitableTimeIntervals.length !== 0;
+                return suitableTimeIntervals.length !== 0;
             },
             enumerable: true
         },
@@ -147,7 +138,7 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
                     return '';
                 }
 
-                var date = this.suitableTimeIntervals[0].from;
+                var date = suitableTimeIntervals[0].from;
                 var day = week[date.getUTCDate() - 1];
                 var hours = formatTime(date.getUTCHours());
                 var minutes = formatTime(date.getUTCMinutes());
@@ -160,14 +151,18 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
         },
         'tryLater': {
             value: function () {
-                var start = new Date(this.suitableTimeIntervals[0].from);
+                if (!this.exists()) {
+                    return false;
+                }
+
+                var start = new Date(suitableTimeIntervals[0].from);
                 start.setUTCMinutes(start.getUTCMinutes() + 30);
-                var delay = { from: this.suitableTimeIntervals[0].from, to: start };
-                var intervals = subtractTimeInterval(this.suitableTimeIntervals, delay);
+                var delay = { from: suitableTimeIntervals[0].from, to: start };
+                var intervals = subtractTimeInterval(suitableTimeIntervals, delay);
                 intervals = intervals.filter(isSuitable);
 
                 if (intervals.length !== 0) {
-                    this.suitableTimeIntervals = intervals;
+                    suitableTimeIntervals = intervals;
                 }
 
                 return intervals.length !== 0;
