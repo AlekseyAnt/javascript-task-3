@@ -134,9 +134,9 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
                 return '';
             }
 
-            var date = suitableTimeIntervals[0].from.date;
+            var date = getLaterTime(suitableTimeIntervals[0].from, 60 * timeZoneOfBank).date;
             var day = DAYS_OF_WEEK[date.getUTCDate() - 1];
-            var hours = formatTime(date.getUTCHours() + timeZoneOfBank);
+            var hours = formatTime(date.getUTCHours());
             var minutes = formatTime(date.getUTCMinutes());
 
             return template.replace('%HH', hours)
