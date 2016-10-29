@@ -6,93 +6,98 @@
  */
 exports.isStar = true;
 
-function subtractTimeInterval(timeIntervals, interval) {
+var DAYS_OF_WEEK = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+var POTENTIAL_DAYS_OF_ROBBERY = ['ПН', 'ВТ', 'СР'];
+var MILLISECONDS_IN_MINUTE = 60 * 1000;
+
+function TimeInterval(from, to) {
+    this.from = from;
+    this.to = to;
+    this.duration = function () {
+        return this.to.date - this.from.date;
+    };
+}
+
+function DateTime(date, timeZone) {
+    this.date = date;
+    this.timeZone = timeZone;
+    this.valueOf = function () {
+        return this.date.getTime();
+    };
+}
+
+function parseDate(dateStr) {
+    var matches = dateStr.match(/([а-я]{2})*\s*(\d{2}):(\d{2})\+(\d{1,2})/i);
+    var dayOfMonth = 1 + DAYS_OF_WEEK.indexOf(matches[1]);
+    var currentTimeZone = Number(matches[4]);
+    var hours = Number(matches[2]) - currentTimeZone;
+    var minutes = Number(matches[3]);
+    var date = new Date(Date.UTC(2016, 10, dayOfMonth, hours, minutes));
+
+    return new DateTime(date, currentTimeZone);
+}
+
+function parseInterval(interval) {
+    return new TimeInterval(parseDate(interval.from), parseDate(interval.to));
+}
+
+function getTimeIntervalsOfBankWork(workingHours) {
+    return POTENTIAL_DAYS_OF_ROBBERY.map(function (day) {
+        var newFrom = day + ' ' + workingHours.from;
+        var newTo = day + ' ' + workingHours.to;
+
+        return parseInterval({ from: newFrom, to: newTo });
+    });
+}
+
+function getBusyTimeIntervals(scheduleOfGangs) {
+    var gangs = Object.keys(scheduleOfGangs);
+
+    return gangs.reduce(function (intervals, gang) {
+        var timeIntervals = scheduleOfGangs[gang].map(parseInterval);
+
+        return intervals.concat(timeIntervals);
+    },
+    []);
+}
+
+function intervalDifference(currentInterval, interval) {
+    if (interval.to < currentInterval.from || interval.from > currentInterval.to) {
+        return [currentInterval];
+    }
+
     var difference = [];
-    interval = { from: interval.from, to: interval.to };
 
-    for (var i = 0; i < timeIntervals.length; i++) {
-        if (interval.to <= timeIntervals[i].from) {
-            return difference.concat(timeIntervals.slice(i));
-        }
+    if (interval.from > currentInterval.from) {
+        difference.push(new TimeInterval(currentInterval.from, interval.from));
+    }
 
-        if (interval.from > timeIntervals[i].to) {
-            difference.push(timeIntervals[i]);
-            continue;
-        }
-
-        if (interval.from > timeIntervals[i].from) {
-            difference.push({ from: timeIntervals[i].from, to: interval.from });
-        }
-
-        if (interval.to < timeIntervals[i].to) {
-            difference.push({ from: interval.to, to: timeIntervals[i].to });
-
-            return difference.concat(timeIntervals.slice(i + 1));
-        }
-
-        interval.from = timeIntervals[i].to;
+    if (interval.to < currentInterval.to) {
+        difference.push(new TimeInterval(interval.to, currentInterval.to));
     }
 
     return difference;
 }
 
-var potentialDaysOfRobbery = ['ПН', 'ВТ', 'СР'];
-
-function getTimeIntervalsOfBankWork(workingHours) {
-    return potentialDaysOfRobbery.map(function (day) {
-        var newFrom = day + ' ' + workingHours.from;
-        var newTo = day + ' ' + workingHours.to;
-
-        return { from: newFrom, to: newTo };
-    });
-}
-
-function getNonFreeTimeIntervals(scheduleOfGangs) {
-    var gangs = Object.keys(scheduleOfGangs);
-
-    return gangs.reduce(function (intervals, gang) {
-        return intervals.concat(scheduleOfGangs[gang]);
-    },
-    []);
-}
-
-var week = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-
-function parseDate(date, initialReferencePoint) {
-    var newDate = rewriteDay(date);
-
-    var currenttimeZone = parseInt(date.match(/\+(\d{1,2})/i)[0], 10);
-    var deffTimeZone = initialReferencePoint - currenttimeZone;
-
-    newDate.setUTCHours(newDate.getUTCHours() + deffTimeZone);
-
-    return newDate;
-}
-
-function rewriteDay(dateStr) {
-    var date = dateStr.match(/([а-я]{2}) (\d{2}):(\d{2})/i);
-    var dayOfMonth = 1 + week.indexOf(date[1]);
-    var hours = parseInt(date[2], 10);
-    var minutes = parseInt(date[3], 10);
-
-    return new Date(Date.UTC(2016, 10, dayOfMonth, hours, minutes));
-}
-
-function parseTimeIntervals(intervals, initialReferencePoint) {
-    return intervals.map(function (interval) {
-        return {
-            from: parseDate(interval.from, initialReferencePoint),
-            to: parseDate(interval.to, initialReferencePoint)
-        };
-    });
+function subtractTimeInterval(timeIntervals, interval) {
+    return timeIntervals.reduce(function (result, currentInterval) {
+        return result.concat(intervalDifference(currentInterval, interval));
+    }, []);
 }
 
 function toMillisecond(minutes) {
-    return minutes * 60 * 1000;
+    return minutes * MILLISECONDS_IN_MINUTE;
 }
 
 function formatTime(time) {
-    return ((time < 10) ? '0' : '') + time.toString();
+    return ((time < 10) ? '0' : '') + time;
+}
+
+function getLaterTime(dateTime, minutes) {
+    var date = new Date(dateTime.date);
+    date.setUTCMinutes(date.getUTCMinutes() + minutes);
+
+    return new DateTime(date, dateTime.timeZone);
 }
 
 /**
@@ -106,70 +111,54 @@ function formatTime(time) {
 exports.getAppropriateMoment = function (schedule, duration, workingHours) {
     console.info(schedule, duration, workingHours);
 
-    var timeZoneOfBank = parseInt(workingHours.from.slice(5, 8), 10);
-
-    var nonFreeTimeIntervals = getNonFreeTimeIntervals(schedule);
+    var timeZoneOfBank = parseDate(workingHours.from).timeZone;
+    var busyTimeIntervals = getBusyTimeIntervals(schedule);
     var timeIntervalsOfBankWork = getTimeIntervalsOfBankWork(workingHours);
-
-    var nonFreeIntervals = parseTimeIntervals(nonFreeTimeIntervals, timeZoneOfBank);
-    var intervalsOfBankWork = parseTimeIntervals(timeIntervalsOfBankWork, timeZoneOfBank);
-
     var workTime = toMillisecond(duration);
 
     function isSuitable(timeInterval) {
-        return timeInterval.to - timeInterval.from >= workTime;
+        return timeInterval.duration() >= workTime;
     }
 
-    var suitableTimeIntervals = nonFreeIntervals.reduce(subtractTimeInterval, intervalsOfBankWork)
-                                                .filter(isSuitable);
+    var suitableTimeIntervals = busyTimeIntervals
+                                        .reduce(subtractTimeInterval, timeIntervalsOfBankWork)
+                                        .filter(isSuitable);
 
-    var obj = {};
-
-    Object.defineProperties(obj, {
-        'exists': {
-            value: function () {
-                return suitableTimeIntervals.length !== 0;
-            },
-            enumerable: true
+    return {
+        exists: function () {
+            return suitableTimeIntervals.length !== 0;
         },
-        'format': {
-            value: function (template) {
-                if (!this.exists()) {
-                    return '';
-                }
 
-                var date = suitableTimeIntervals[0].from;
-                var day = week[date.getUTCDate() - 1];
-                var hours = formatTime(date.getUTCHours());
-                var minutes = formatTime(date.getUTCMinutes());
+        format: function (template) {
+            if (!this.exists()) {
+                return '';
+            }
 
-                return template.replace('%HH', hours)
-                               .replace('%DD', day)
-                               .replace('%MM', minutes);
-            },
-            enumerable: true
+            var date = suitableTimeIntervals[0].from.date;
+            var day = DAYS_OF_WEEK[date.getUTCDate() - 1];
+            var hours = formatTime(date.getUTCHours() + timeZoneOfBank);
+            var minutes = formatTime(date.getUTCMinutes());
+
+            return template.replace('%HH', hours)
+                           .replace('%DD', day)
+                           .replace('%MM', minutes);
         },
-        'tryLater': {
-            value: function () {
-                if (!this.exists()) {
-                    return false;
-                }
 
-                var start = new Date(suitableTimeIntervals[0].from);
-                start.setUTCMinutes(start.getUTCMinutes() + 30);
-                var delay = { from: suitableTimeIntervals[0].from, to: start };
-                var intervals = subtractTimeInterval(suitableTimeIntervals, delay);
-                intervals = intervals.filter(isSuitable);
+        tryLater: function () {
+            if (!this.exists()) {
+                return false;
+            }
 
-                if (intervals.length !== 0) {
-                    suitableTimeIntervals = intervals;
-                }
+            var to = getLaterTime(suitableTimeIntervals[0].from, 30);
+            var delay = new TimeInterval(suitableTimeIntervals[0].from, to);
+            var intervals = subtractTimeInterval(suitableTimeIntervals, delay).filter(isSuitable);
+            var existsLaterTimeInterval = intervals.length !== 0;
 
-                return intervals.length !== 0;
-            },
-            enumerable: true
+            if (existsLaterTimeInterval) {
+                suitableTimeIntervals = intervals;
+            }
+
+            return existsLaterTimeInterval;
         }
-    });
-
-    return obj;
+    };
 };
